@@ -15,7 +15,7 @@
 % エッジ集合にて定義
 
 % 最小グラフ
-E = [ 1,2; 2,1];
+E = [ 1,2;1,5;2,5;3,7;4,6;5,7;6,8;7,8];
 
 num_x = max( max(E) );
 
@@ -46,9 +46,18 @@ num_x = max( max(E) );
     x = sym('x',[num_x 1]);
     
     %% Gの決定
-    G_sym = x(2)-x(1);
+    % 奇数が需要家, 偶数が供給家
+    G_sym = -sym('x',1);
+    for i=2:num_x
+        R = rem(i,2);
+        if R ~= 0
+            G_sym = G_sym - x(i);
+        else
+            G_sym = G_sym + x(i);
+        end
+    end
     num_G = length(G_sym);
-    
+    G_sym
 %     disp('Gの準備中');
     
     %% λの定義
@@ -60,7 +69,7 @@ num_x = max( max(E) );
     
     %% d(λG)/dx　（手打ち）
     dlGdx_sym = sym('dlGdx_sym',[num_x 1]);
-    dlGdxi = cell(num_x);
+    dlGdxi = cell(num_x,1);
     for n=1:num_x
         dlGdx_sym(n) = diff(lG_sym, x(n));
         dlGdxi{n} = matlabFunction(dlGdx_sym(n));
@@ -166,7 +175,7 @@ if f_plot == 'y'
     title('xiの推移');
     plot(time_h,X_min(:,:));
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
-    axis([0,20,-50,50]);
+%     axis([0,20,-50,50]);
     grid on;
     
     

@@ -15,7 +15,7 @@
 % エッジ集合にて定義
 
 % 最小グラフ
-E = [ 1,2; 2,1];
+E = [ 1,2;1,5;2,5;3,7;4,6;5,7;6,8;7,8];
 
 num_x = max( max(E) );
 
@@ -46,7 +46,16 @@ num_x = max( max(E) );
     x = sym('x',[num_x 1]);
     
     %% Gの決定
-    G_sym = x(2)-x(1);
+    % 奇数が需要家, 偶数が供給家
+    G_sym = -sym('x',1)
+    for i=2:num_x
+        R = rem(i,2);
+        if R ~= 0
+            G_sym = G_sym - x(i);
+        else
+            G_sym = G_sym + x(i);
+        end
+    end
     num_G = length(G_sym);
     
 %     disp('Gの準備中');
@@ -60,7 +69,7 @@ num_x = max( max(E) );
     
     %% d(λG)/dx　（手打ち）
     dlGdx_sym = sym('dlGdx_sym',[num_x 1]);
-    dlGdxi = cell(num_x);
+    dlGdxi = cell(num_x,1);
     for n=1:num_x
         dlGdx_sym(n) = diff(lG_sym, x(n));
         dlGdxi{n} = matlabFunction(dlGdx_sym(n));
@@ -138,7 +147,7 @@ if f_run == 'y'
         X(:,step) = x;
         
         %λの更新
-        LAMBDA(1,step) = LAMBDA(1,step-1) + B_p*(X(2,step) - X(1,step)) ;
+        LAMBDA(1,step) = LAMBDA(1,step-1) + B_p*(X(2,step-1) - X(1,step-1)) ;
     end
 end
 clear f_run;
@@ -151,13 +160,11 @@ if isempty(f_plot)
 end
 if f_plot == 'y'
     
-    LAMBDA_plot = zeros(num_lambda, stp_max);
-    
     
     LAMBDA_min = zeros([num_lambda stp_max*60]);
     for t=1:num_lambda
         for m=1:60
-            LAMBDA_min(:,(t-1)*60+m)=LAMBDA_plot(:,t);
+            LAMBDA_min(:,(t-1)*60+m)=LAMBDA(:,t);
         end
     end
     
@@ -165,14 +172,19 @@ if f_plot == 'y'
     time_h = time_min./60;
     
     figure(1);
+    title('xiの推移');
     plot(time_h,X_min(:,:));
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
     axis([0,20,-50,50]);
-    title('xiの推移');
     grid on;
     
+    
     figure(2);
-    plot(time_h,LAMBDA(:,:));
+    title('λの推移');
+    plot(time_h,LAMBDA_min(:,:));
+    axis([0,1.5,0,1]);
+    set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
+    grid on;
     
 end
 clear f_plot;
