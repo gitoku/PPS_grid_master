@@ -15,7 +15,7 @@
 % エッジ集合にて定義
 
 % 最小グラフ
-E = [ 1,2;1,5;2,5;3,7;4,6;5,7;6,8;7,8];
+E = [ 1,2;2,1;1,3;3,4];
 
 num_x = max( max(E) );
 
@@ -58,6 +58,10 @@ num_x = max( max(E) );
     end
     num_G = length(G_sym);
     G_sym
+    G = cell(num_G);
+    for m=1:num_G
+        G{m} = matlabFunction(G_sym(m),'vars',{x});
+    end
 %     disp('Gの準備中');
     
     %% λの定義
@@ -65,7 +69,7 @@ num_x = max( max(E) );
     lambda = sym('lambda');
     
     % λGの決定
-    lG_sym = lambda.'*G_sym;
+    lG_sym = lambda.'*G_sym
     
     %% d(λG)/dx　（手打ち）
     dlGdx_sym = sym('dlGdx_sym',[num_x 1]);
@@ -94,6 +98,7 @@ stp_max = day*3+1;    %s(実行step数)の最大
 eps_x = .001;   %x[k]の更新の打ち切り基準:dx[k]<eps_x
 dx_max = 1000;    %x[k]の更新の計算中止dx
 
+d = 10*rand([num_x 1])
 
 %% シミュレーション実行
 f_run = input('run?[y,n]','s');  %yで実行
@@ -103,14 +108,13 @@ end
 if f_run == 'y'
     %% x,λの推移を記憶
     
-    
     X = ones(num_x, stp_max);
     X_min = ones(num_x,stp_max*60);
     LAMBDA = ones(num_lambda, stp_max);  % スーパバイザ方式
 
     
     %% 初期条件(step = 1)
-    X(:,1) = rand([num_x 1]);
+    X(:,1) =10*rand([num_x 1]);
     for i=1:num_x
         for mi=1:60
             X_min(:,mi) = X(:,1);
@@ -133,21 +137,28 @@ if f_run == 'y'
         for i=1:num_x
             kx=0;
             while kx < 60
+                
+                df = 2*gamma*(X_min(i,(step-1)*60 + kx)-d(i));
+                
                 lambda = LAMBDA(1,step-1);
-                df = 2*X_min(i,(step-1)*60 + kx);
                 dg = dlGdxi{i}(lambda);
                 
-                x(i) = x(i) -A* ( gamma*df + dg);
+                x(i) = x(i) -A* ( df + dg);
                 kx=kx+1;
                 
                 X_min(i,(step-1)*60+kx) = x(i);
+                
+                
             end
         end
         % xの更新
         X(:,step) = x;
         
         %λの更新
-        LAMBDA(1,step) = LAMBDA(1,step-1) + B_p*(X(2,step-1) - X(1,step-1)) ;
+        for m = 1:num_lambda
+            LAMBDA(m,step) =(max(0,LAMBDA(m,step-1) + B_p*G{m}(X(:,step))));
+        end
+        
     end
 end
 clear f_run;
@@ -168,23 +179,46 @@ if f_plot == 'y'
         end
     end
     
+    % Gの推移についてのデータ計算
+    GX = zeros([num_lambda stp_max]);
+    for step = 1:stp_max
+        for m = 1:num_lambda
+            GX(m,step) = G{m}(X(:,step));
+        end
+    end
+    
+    GX_min = zeros([num_lambda stp_max*60]);
+    for m = 1:num_lambda
+        for step=1:stp_max*60
+            GX_min(m,step) = G{m}(X_min(:,step));
+        end
+    end
     time_min = 1:stp_max*60;
     time_h = time_min./60;
     
     figure(1);
     title('xiの推移');
-    plot(time_h,X_min(:,:));
+    plot(time_h,X_min(:,:),'LineWidth',1.5);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
+    axis([0,20,-50,50]);
+    grid on;
+    
+    figure(2);
+    title('Gの推移');
+    plot(time_h,GX_min(:,:),'LineWidth',1.5);
+    set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
+    xlim([0 70]);
 %     axis([0,20,-50,50]);
     grid on;
     
-    
-    figure(2);
-    title('λの推移');
-    plot(time_h,LAMBDA_min(:,:));
-    axis([0,1.5,0,1]);
-    set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
-    grid on;
+%     % λの推移 意味あるかは不明
+%     figure();
+%     title('λの推移');
+%     plot(time_h,LAMBDA_min(:,:));
+%     axis([0,1.5,0,1]);
+%     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
+%     grid on;
+   
     
 end
 clear f_plot;
