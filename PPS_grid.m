@@ -66,6 +66,7 @@ num_x = max( max(E) );
     end
     num_G = length(G_sym);
     G_sym
+    
     G = cell(num_G);
     for m=1:num_G
         G{m} = matlabFunction(G_sym(m),'vars',{x});
@@ -168,7 +169,7 @@ if f_run == 'y'
         end
         
     end
-    X(:,step)
+    last_X = X(:,step)
 end
 clear f_run;
 
@@ -180,28 +181,49 @@ if isempty(f_plot)
 end
 if f_plot == 'y'
     
-    
+    %分単位, λ
     LAMBDA_min = zeros([num_lambda stp_max*60]);
-    for t=1:num_lambda
+    for step=1:stp_max
         for m=1:60
-            LAMBDA_min(:,(t-1)*60+m)=LAMBDA(:,t);
+            LAMBDA_min(:,(step-1)*60+m)=LAMBDA(:,step);
         end
     end
     
-    % Gの推移についてのデータ計算
+    % 目的関数F(x), 制約関数G(x)
+    FX = zeros([1,stp_max]);
     GX = zeros([num_lambda stp_max]);
     for step = 1:stp_max
+        for i = 1:num_x
+            FX(step)= FX(step)+(gamma*(X(i,step)-d(i)).^2);
+        end
+        
         for m = 1:num_lambda
-            GX(m,step) = G{m}(X(:,step));
+            GX(m,step) = G{m}(X_min(:,step));
         end
     end
     
+    % 分単位, 目的関数F(x)
+    FX_min = zeros([1,stp_max*60]);
+    for step=1:stp_max*60    
+        for i=1:num_x
+            FX_min(step)=FX_min(step)+(gamma*(X_min(i,step)-d(i)).^2);
+        end
+         if step==1
+             first_FX=FX_min(:,1)
+         end
+         if step==stp_max*60
+            last_FX=FX_min(:,stp_max*60)
+         end
+    end
+   
+    %分単位, 制約関数G(x)
     GX_min = zeros([num_lambda stp_max*60]);
     for m = 1:num_lambda
         for step=1:stp_max*60
             GX_min(m,step) = G{m}(X_min(:,step));
         end
     end
+    
     time_min = 1:stp_max*60;
     time_h = time_min./60;
     
@@ -209,7 +231,6 @@ if f_plot == 'y'
     title('xiの推移');
     plot(time_h,X_min(:,:),'LineWidth',1.2);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
-%     axis([0,30,-50,50]);
     xlim([0 30]);
     xlabel('step[h]');
     ylabel('x(i)');
@@ -221,20 +242,26 @@ if f_plot == 'y'
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
     xlim([0 70]);
     xlabel('step[h]');
-    ylabel('G');
-%     axis([0,20,-50,50]);
+    ylabel('G(x)');
     grid on;
     
     % λの推移 意味あるかは不明
     figure(3);
     title('λの推移');
     plot(time_h,LAMBDA_min(:,:),'LineWidth',1.2);
-%     axis([0,1.5,0,1]);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
     xlabel('step[h]');
     ylabel('λ');
     grid on;
-   
+    
+    figure(4);
+    title('Fの推移');
+    plot(time_h,FX_min(:,:),'LineWidth',1.2);
+    set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
+    xlim([0 30]);
+    xlabel('step[h]');
+    ylabel('F(x)');
+    grid on;
     
 end
 clear f_plot;
