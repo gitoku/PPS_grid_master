@@ -127,9 +127,9 @@ if f_run == 'y'
         end
     end
     
-    LAMBDA(:,1) = rand(1);
+    LAMBDA(:,1) = rand(1); %É…ÇÃèâä˙íl
 
-    d = rand([num_x 1])   % 
+    d = rand([num_x 1])   % xiÇÃèäñ]ó 
 
     
     
@@ -169,6 +169,8 @@ if f_run == 'y'
         
     end
     last_X = X(:,step)
+    
+    save PPS_result;
 end
 clear f_run;
 
@@ -193,7 +195,7 @@ if f_plot == 'y'
     GX = zeros([num_lambda stp_max]);
     for step = 1:stp_max
         for i = 1:num_x
-            FX(step)= FX(step)+(gamma*(X(i,step)-d(i)).^2);
+            FX(step)= FX(step)+(gamma*( X(i,step)-d(i) ).^2);
         end
         
         for m = 1:num_lambda
@@ -244,7 +246,7 @@ if f_plot == 'y'
     plot(time_h,LAMBDA_min(:,:),'LineWidth',1.2);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
     xlabel('step[h]');
-    ylabel('É…');
+    ylabel('lambda');
     grid on;
     
     figure(4);

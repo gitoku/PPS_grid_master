@@ -169,6 +169,8 @@ if f_run == 'y'
         
     end
     last_X = X(:,step)
+    
+    save PPS_result;
 end
 clear f_run;
 
@@ -244,7 +246,7 @@ if f_plot == 'y'
     plot(time_h,LAMBDA_min(:,:),'LineWidth',1.2);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
     xlabel('step[h]');
-    ylabel('É…');
+    ylabel('lambda');
     grid on;
     
     figure(4);
