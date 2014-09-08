@@ -15,7 +15,7 @@
 % エッジ集合にて定義
 
 % 最小グラフ
-E = [ 1,2;2,1;1,3;3,4];
+E = [ 1,2;2,1];
 
 num_x = max( max(E) );
 
@@ -45,14 +45,22 @@ num_x = max( max(E) );
     %% xの決定
     x = sym('x',[num_x 1]);
     
+    %エージェントタイプ
+    %1:供給家
+    %2:需要家
+    
+    agt_type=[
+        2,1,...%Region1
+    ];
+    
     %% Gの決定
     % 奇数が需要家, 偶数が供給家
     G_sym = -sym('x',1);
     for i=2:num_x
-        R = rem(i,2);
-        if R ~= 0
+        
+        if agt_type(i)==2
             G_sym = G_sym - x(i);
-        else
+        elseif agt_type(i)==1
             G_sym = G_sym + x(i);
         end
     end
@@ -98,7 +106,7 @@ stp_max = day*3+1;    %s(実行step数)の最大
 eps_x = .001;   %x[k]の更新の打ち切り基準:dx[k]<eps_x
 dx_max = 1000;    %x[k]の更新の計算中止dx
 
-d = 10*rand([num_x 1])
+d = rand([num_x 1])
 
 %% シミュレーション実行
 f_run = input('run?[y,n]','s');  %yで実行
@@ -114,7 +122,7 @@ if f_run == 'y'
 
     
     %% 初期条件(step = 1)
-    X(:,1) =10*rand([num_x 1]);
+    X(:,1) =rand([num_x 1]);
     for i=1:num_x
         for mi=1:60
             X_min(:,mi) = X(:,1);
@@ -156,10 +164,11 @@ if f_run == 'y'
         
         %λの更新
         for m = 1:num_lambda
-            LAMBDA(m,step) =(max(0,LAMBDA(m,step-1) + B_p*G{m}(X(:,step))));
+            LAMBDA(m,step) =(max(0, LAMBDA(m,step-1) + B_p*G{m}(X(:,step))));
         end
         
     end
+    X(:,step)
 end
 clear f_run;
 
@@ -198,26 +207,33 @@ if f_plot == 'y'
     
     figure(1);
     title('xiの推移');
-    plot(time_h,X_min(:,:),'LineWidth',1.5);
+    plot(time_h,X_min(:,:),'LineWidth',1.2);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
-    axis([0,20,-50,50]);
+%     axis([0,30,-50,50]);
+    xlim([0 30]);
+    xlabel('step[h]');
+    ylabel('x(i)');
     grid on;
     
     figure(2);
     title('Gの推移');
-    plot(time_h,GX_min(:,:),'LineWidth',1.5);
+    plot(time_h,GX_min(:,:),'LineWidth',1.2);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
     xlim([0 70]);
+    xlabel('step[h]');
+    ylabel('G');
 %     axis([0,20,-50,50]);
     grid on;
     
-%     % λの推移 意味あるかは不明
-%     figure();
-%     title('λの推移');
-%     plot(time_h,LAMBDA_min(:,:));
+    % λの推移 意味あるかは不明
+    figure(3);
+    title('λの推移');
+    plot(time_h,LAMBDA_min(:,:),'LineWidth',1.2);
 %     axis([0,1.5,0,1]);
-%     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
-%     grid on;
+    set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
+    xlabel('step[h]');
+    ylabel('λ');
+    grid on;
    
     
 end
