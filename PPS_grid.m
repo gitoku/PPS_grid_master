@@ -1,13 +1,13 @@
 %%初期化処理
-% f_init = input('initialize?[y,n]','s');  %'y'の時,初期化処理実行
-% if isempty(f_init)
-%     f_init = 'n' ;
-% end
-% 
-% 
-% if f_init == 'y'
+f_init = input('initialize?[y,n]','s');  %'y'の時,初期化処理実行
+if isempty(f_init)
+    f_init = 'n' ;
+end
+
+
+if f_init == 'y'
     clear all;
-%     disp('初期化中...');
+    disp('初期化中...');
     %% 
     
 %%グラフの定義###
@@ -15,7 +15,7 @@
 % エッジ集合にて定義
 
 % 最小グラフ
-E = [ 1,2;2,1];
+E = [ 1,2;1,2 ];
 
 num_x = max( max(E) );
 
@@ -57,7 +57,6 @@ num_x = max( max(E) );
     % 奇数が需要家, 偶数が供給家
     G_sym = -sym('x',1);
     for i=2:num_x
-        
         if agt_type(i)==2
             G_sym = G_sym - x(i);
         elseif agt_type(i)==1
@@ -89,9 +88,7 @@ num_x = max( max(E) );
     end
     dlGdx = matlabFunction(dlGdx_sym);
 %% 
-% end
-% disp('完了');
-
+end
 
 %% パラメータ設定
 A =2;
@@ -107,7 +104,6 @@ stp_max = day*3+1;    %s(実行step数)の最大
 eps_x = .001;   %x[k]の更新の打ち切り基準:dx[k]<eps_x
 dx_max = 1000;    %x[k]の更新の計算中止dx
 
-d = rand([num_x 1])
 
 %% シミュレーション実行
 f_run = input('run?[y,n]','s');  %yで実行
@@ -123,6 +119,7 @@ if f_run == 'y'
 
     
     %% 初期条件(step = 1)
+    
     X(:,1) =rand([num_x 1]);
     for i=1:num_x
         for mi=1:60
@@ -130,7 +127,9 @@ if f_run == 'y'
         end
     end
     
-    LAMBDA(:,1) = rand(1);
+    LAMBDA(:,1) = rand(1); %λの初期値
+
+    d = rand([num_x 1])   % xiの所望量
 
     
     
@@ -208,12 +207,6 @@ if f_plot == 'y'
         for i=1:num_x
             FX_min(step)=FX_min(step)+(gamma*(X_min(i,step)-d(i)).^2);
         end
-         if step==1
-             first_FX=FX_min(:,1)
-         end
-         if step==stp_max*60
-            last_FX=FX_min(:,stp_max*60)
-         end
     end
    
     %分単位, 制約関数G(x)
