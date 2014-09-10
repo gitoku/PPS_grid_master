@@ -1,4 +1,4 @@
-%%初期化処理
+%% 初期化処理
 f_init = input('initialize?[y,n]','s');  %'y'の時,初期化処理実行
 if isempty(f_init)
     f_init = 'n' ;
@@ -8,17 +8,18 @@ end
 if f_init == 'y'
     clear all;
     disp('初期化中...');
-    %% 
     
-%%グラフの定義###
+%% グラフの定義###
 
 % エッジ集合にて定義
 
 % 最小グラフ
-E = [ 1,2;1,2 ];
+E = [   
+    1,4;2,5;3,6;
+];
 
 num_x = max( max(E) );
-
+num_agt = num_x/3;
 
 % 隣接行列 N
     N = zeros([num_x,num_x]);
@@ -50,7 +51,7 @@ num_x = max( max(E) );
     %2:需要家
     
     agt_type=[
-        2,1,...%Region1
+        2,2,2,1,1,1,...%Region1
     ];
     
     %% Gの決定
@@ -87,7 +88,7 @@ num_x = max( max(E) );
         dlGdxi{n} = matlabFunction(dlGdx_sym(n));
     end
     dlGdx = matlabFunction(dlGdx_sym);
-%% 
+    
 end
 
 %% パラメータ設定
@@ -129,9 +130,17 @@ if f_run == 'y'
     
     LAMBDA(:,1) = rand(1); %λの初期値
 
-    d = rand([num_x 1])   % xiの所望量
-
-    
+    d = rand([num_x 1]);  % xiの所望量
+    for i=1:num_x
+        if i==1 || i==4
+            d(i)=rand(1);
+        elseif i==2 || i==3
+            d(i)=d(1);
+        elseif i==5 || i==6
+            d(i)=d(4);
+        end 
+    end
+    d
     
     %% ステップ実行(step >=2)
 %     disp('実行中...');
@@ -144,6 +153,25 @@ if f_run == 'y'
         %各ノードについてのループ
         for i=1:num_x
             kx=0;
+            
+            % 10分後, 20分後の初期値を決定
+            if i==2
+                X(i,1) = X_min(1,60+11);      
+            end
+            if i==3 
+                X(i,1) = X_min(1,60+21);            
+            end
+            if i==5
+                X(i,1) = X_min(2,60+11);            
+            end
+            if i==6
+                X(i,1) = X_min(2,60+21);            
+            end
+            
+            for mi=1:60
+                X_min(:,mi) = X(:,1);
+            end
+            
             while kx < 60
                 
                 df = 2*gamma*(X_min(i,(step-1)*60 + kx)-d(i));
@@ -170,7 +198,7 @@ if f_run == 'y'
     end
     last_X = X(:,step)
     
-    save PPS_result;
+    save result;
 end
 clear f_run;
 
@@ -195,7 +223,7 @@ if f_plot == 'y'
     GX = zeros([num_lambda stp_max]);
     for step = 1:stp_max
         for i = 1:num_x
-            FX(step)= FX(step)+(gamma*(X(i,step)-d(i)).^2);
+            FX(step)= FX(step)+(gamma*( X(i,step)-d(i) ).^2);
         end
         
         for m = 1:num_lambda
@@ -245,6 +273,7 @@ if f_plot == 'y'
     title('λの推移');
     plot(time_h,LAMBDA_min(:,:),'LineWidth',1.2);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
+    xlim([0 70]);
     xlabel('step[h]');
     ylabel('lambda');
     grid on;
@@ -257,7 +286,13 @@ if f_plot == 'y'
     xlabel('step[h]');
     ylabel('F(x)');
     grid on;
-    
+   
+    figure(5);
+    title('x');
+    plot(X_min(1,:),FX_min(1,:),'LineWidth',1.2);
+    set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
+    grid on;
+   
 end
 clear f_plot;
 
