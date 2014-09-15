@@ -15,7 +15,7 @@ if f_init == 'y'
 
 % 最小グラフ
 E = [   
-    1,4;2,5;3,6;
+    1,2;2,1;
 ];
 
 num_x = max( max(E) );
@@ -51,7 +51,7 @@ num_agt = num_x/3;
     %2:需要家
     
     agt_type=[
-        2,2,2,1,1,1,...%Region1
+        2,1,...%Region1
     ];
     
     %% Gの決定
@@ -100,7 +100,6 @@ c = .1./L_diag;
 B_p = B/sum(1./c);  %スーパバイザ用のB
 
 day = 24;
-c_delay = 5;
 stp_max = day*3+1;    %s(実行step数)の最大
 eps_x = .001;   %x[k]の更新の打ち切り基準:dx[k]<eps_x
 dx_max = 1000;    %x[k]の更新の計算中止dx
@@ -127,19 +126,20 @@ if f_run == 'y'
             X_min(:,mi) = X(:,1);
         end
     end
+    X(:,1)
     
     LAMBDA(:,1) = rand(1); %λの初期値
 
     d = rand([num_x 1]);  % xiの所望量
-    for i=1:num_x
-        if i==1 || i==4
-            d(i)=rand(1);
-        elseif i==2 || i==3
-            d(i)=d(1);
-        elseif i==5 || i==6
-            d(i)=d(4);
-        end 
-    end
+%     for i=1:num_x
+%         if i==1 || i==4
+%             d(i)=rand(1);
+%         elseif i==2 || i==3
+%             d(i)=d(1);
+%         elseif i==5 || i==6
+%             d(i)=d(4);
+%         end 
+%     end
     d
     
     %% ステップ実行(step >=2)
@@ -154,24 +154,6 @@ if f_run == 'y'
         for i=1:num_x
             kx=0;
             
-            % 10分後, 20分後の初期値を決定
-            if i==2
-                X(i,1) = X_min(1,60+11);      
-            end
-            if i==3 
-                X(i,1) = X_min(1,60+21);            
-            end
-            if i==5
-                X(i,1) = X_min(2,60+11);            
-            end
-            if i==6
-                X(i,1) = X_min(2,60+21);            
-            end
-            
-            for mi=1:60
-                X_min(:,mi) = X(:,1);
-            end
-            
             while kx < 60
                 
                 df = 2*gamma*(X_min(i,(step-1)*60 + kx)-d(i));
@@ -182,9 +164,7 @@ if f_run == 'y'
                 x(i) = x(i) -A* ( df + dg);
                 kx=kx+1;
                 
-                X_min(i,(step-1)*60+kx) = x(i);
-                
-                
+                X_min(i,(step-1)*60+kx) = x(i); 
             end
         end
         % xの更新
@@ -268,7 +248,6 @@ if f_plot == 'y'
     ylabel('G(x)');
     grid on;
     
-    % λの推移 意味あるかは不明
     figure(3);
     title('λの推移');
     plot(time_h,LAMBDA_min(:,:),'LineWidth',1.2);
@@ -285,12 +264,6 @@ if f_plot == 'y'
     xlim([0 30]);
     xlabel('step[h]');
     ylabel('F(x)');
-    grid on;
-   
-    figure(5);
-    title('x');
-    plot(X_min(1,:),FX_min(1,:),'LineWidth',1.2);
-    set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
     grid on;
    
 end
