@@ -99,10 +99,10 @@ c = .1./L_diag;
 
 B_p = B/sum(1./c);  %スーパバイザ用のB
 
-day = 24;
-stp_max = day*3+1;    %s(実行step数)の最大
+stp_max = 70;    %s(実行step数)の最大
+opt_max = 100;
 eps_x = .001;   %x[k]の更新の打ち切り基準:dx[k]<eps_x
-dx_max = 1000;    %x[k]の更新の計算中止dx
+x_max = 1000;    %x[k]の更新の計算中止dx
 
 
 %% シミュレーション実行
@@ -114,60 +114,51 @@ if f_run == 'y'
     %% x,λの推移を記憶
     
     X = ones(num_x, stp_max);
-    X_min = ones(num_x,stp_max*60);
+    X_loop = ones(num_x,opt_max);
     LAMBDA = ones(num_lambda, stp_max);  % スーパバイザ方式
 
     
     %% 初期条件(step = 1)
     
     X(:,1) =rand([num_x 1]);
-    for i=1:num_x
-        for mi=1:60
-            X_min(:,mi) = X(:,1);
-        end
-    end
-    X(:,1)
+    X_loop(:,1,1) = X(:,1);
+    first_x=X_loop(:,1)
     
     LAMBDA(:,1) = rand(1); %λの初期値
-
-    d = rand([num_x 1]);  % xiの所望量
-%     for i=1:num_x
-%         if i==1 || i==4
-%             d(i)=rand(1);
-%         elseif i==2 || i==3
-%             d(i)=d(1);
-%         elseif i==5 || i==6
-%             d(i)=d(4);
-%         end 
-%     end
-    d
+    d = rand([num_x 1]) % xiの所望量
     
     %% ステップ実行(step >=2)
 %     disp('実行中...');
     for step = 2:stp_max
         
-        % xの更新
         % x[0]の準備
         x = X(:, step-1);
         
         %各ノードについてのループ
         for i=1:num_x
-            kx=0;
-            
-            while kx < 60
-                
-                df = 2*gamma*(X_min(i,(step-1)*60 + kx)-d(i));
-                
+            k=2;
+            while true
+                % xの更新
+                df = 2*gamma*(X_loop(i,k-1)-d(i));
                 lambda = LAMBDA(1,step-1);
                 dg = dlGdxi{i}(lambda);
-                
                 x(i) = x(i) -A* ( df + dg);
-                kx=kx+1;
                 
-                X_min(i,(step-1)*60+kx) = x(i); 
+                X_loop(i,k)=x(i);
+                dx = X_loop(i,k)-X_loop(i,k-1);
+                if abs(dx) < eps_x
+                    for n=k:opt_max
+                        X_loop(i,n)=X_loop(i,k);
+                    end
+                    break;
+                elseif abs(dx)>x_max
+                    disp('発散');
+                    break;
+                end
+                
+                k=k+1;
             end
         end
-        % xの更新
         X(:,step) = x;
         
         %λの更新
@@ -190,79 +181,55 @@ if isempty(f_plot)
 end
 if f_plot == 'y'
     
-    %分単位, λ
-    LAMBDA_min = zeros([num_lambda stp_max*60]);
-    for step=1:stp_max
-        for m=1:60
-            LAMBDA_min(:,(step-1)*60+m)=LAMBDA(:,step);
-        end
-    end
-    
-    % 目的関数F(x), 制約関数G(x)
-    FX = zeros([1,stp_max]);
+    FX = zeros([stp_max 1]);
     GX = zeros([num_lambda stp_max]);
-    for step = 1:stp_max
-        for i = 1:num_x
-            FX(step)= FX(step)+(gamma*( X(i,step)-d(i) ).^2);
-        end
-        
-        for m = 1:num_lambda
-            GX(m,step) = G{m}(X_min(:,step));
-        end
-    end
-    
-    % 分単位, 目的関数F(x)
-    FX_min = zeros([1,stp_max*60]);
-    for step=1:stp_max*60    
+    for step=1:stp_max
         for i=1:num_x
-            FX_min(step)=FX_min(step)+(gamma*(X_min(i,step)-d(i)).^2);
+            FX(step)= gamma*(X(i,step)-d(i))^2;
         end
-    end
-   
-    %分単位, 制約関数G(x)
-    GX_min = zeros([num_lambda stp_max*60]);
-    for m = 1:num_lambda
-        for step=1:stp_max*60
-            GX_min(m,step) = G{m}(X_min(:,step));
+        for m=1:num_lambda
+            GX(m,step) = G{m}(X(:,step));
         end
     end
     
-    time_min = 1:stp_max*60;
-    time_h = time_min./60;
+    time=0:stp_max-1;
+    opt_time=opt_max;
+   
+    
     
     figure(1);
-    title('xiの推移');
-    plot(time_h,X_min(:,:),'LineWidth',1.2);
+    title('xの推移');
+    plot(time,X(:,:),'LineWidth',1.5);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
-    xlim([0 30]);
-    xlabel('step[h]');
+    xlim([1 30]);
+    xlabel('step');
     ylabel('x(i)');
     grid on;
     
     figure(2);
     title('Gの推移');
-    plot(time_h,GX_min(:,:),'LineWidth',1.2);
+    plot(time,GX(:,:),'LineWidth',1.5);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
     xlim([0 70]);
-    xlabel('step[h]');
+    xlabel('step');
     ylabel('G(x)');
     grid on;
     
     figure(3);
     title('λの推移');
-    plot(time_h,LAMBDA_min(:,:),'LineWidth',1.2);
+    plot(time,LAMBDA(:,:),'LineWidth',1.5);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
     xlim([0 70]);
-    xlabel('step[h]');
+    xlabel('step');
     ylabel('lambda');
     grid on;
     
     figure(4);
-    title('Fの推移');
-    plot(time_h,FX_min(:,:),'LineWidth',1.2);
+    title('F(x)の推移');
+    plot(time,FX(:,:),'LineWidth',1.5);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
     xlim([0 30]);
-    xlabel('step[h]');
+    xlabel('step');
     ylabel('F(x)');
     grid on;
    
