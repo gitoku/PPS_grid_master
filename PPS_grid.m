@@ -15,11 +15,10 @@ if f_init == 'y'
 
 % 最小グラフ
 E = [   
-    1,2;2,1;
+    1,4;2,5;3,6;
 ];
 
 num_x = max( max(E) );
-num_agt = num_x/3;
 
 % 隣接行列 N
     N = zeros([num_x,num_x]);
@@ -51,7 +50,7 @@ num_agt = num_x/3;
     %2:需要家
     
     agt_type=[
-        2,1,...%Region1
+        2,2,2,1,1,1,...%Region1
     ];
     
     %% Gの決定
@@ -99,7 +98,7 @@ c = .1./L_diag;
 
 B_p = B/sum(1./c);  %スーパバイザ用のB
 
-stp_max = 70;    %s(実行step数)の最大
+stp_max = 50;    %s(実行step数)の最大
 opt_max = 100;
 eps_x = .001;   %x[k]の更新の打ち切り基準:dx[k]<eps_x
 x_max = 1000;    %x[k]の更新の計算中止dx
@@ -120,12 +119,12 @@ if f_run == 'y'
     
     %% 初期条件(step = 1)
     
-    X(:,1) =rand([num_x 1]);
+    X(:,1) =100*rand([num_x 1]);
     X_loop(:,1,1) = X(:,1);
     first_x=X_loop(:,1)
     
-    LAMBDA(:,1) = rand(1); %λの初期値
-    d = rand([num_x 1]) % xiの所望量
+    LAMBDA(:,1) = 10*rand(1); %λの初期値
+    d = 100*rand([num_x 1]) % xiの所望量
     
     %% ステップ実行(step >=2)
 %     disp('実行中...');
@@ -193,6 +192,7 @@ if f_plot == 'y'
     end
     
     time=0:stp_max-1;
+    time2=1:stp_max;
     opt_time=opt_max;
    
     
@@ -201,7 +201,7 @@ if f_plot == 'y'
     title('xの推移');
     plot(time,X(:,:),'LineWidth',1.5);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
-    xlim([1 30]);
+    xlim([0 40]);
     xlabel('step');
     ylabel('x(i)');
     grid on;
@@ -210,7 +210,7 @@ if f_plot == 'y'
     title('Gの推移');
     plot(time,GX(:,:),'LineWidth',1.5);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
-    xlim([0 70]);
+    axis([0 40 -700 100]);
     xlabel('step');
     ylabel('G(x)');
     grid on;
@@ -219,7 +219,7 @@ if f_plot == 'y'
     title('λの推移');
     plot(time,LAMBDA(:,:),'LineWidth',1.5);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
-    xlim([0 70]);
+    xlim([0 40]);
     xlabel('step');
     ylabel('lambda');
     grid on;
@@ -228,7 +228,7 @@ if f_plot == 'y'
     title('F(x)の推移');
     plot(time,FX(:,:),'LineWidth',1.5);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
-    xlim([0 30]);
+    xlim([0 40]);
     xlabel('step');
     ylabel('F(x)');
     grid on;
