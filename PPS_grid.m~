@@ -188,7 +188,7 @@ if f_run == 'y'
         end
         X(:,step) = x;
         
-        %λの更新:スーパバイザ方式
+        %λの更新
         for m = 1:num_lambda
             LAMBDA(m,step) =(max(0, LAMBDA(m,step-1) + B_p*G{m}(X(:,step))));
         end
@@ -196,8 +196,7 @@ if f_run == 'y'
     end
     last_X = X(:,step)
     
-    save ('result','stp_max','d','X','last_X','LAMBDA','gamma');
-    clear all;
+    save ('result','stp_max','');
 end
 clear f_run;
 
@@ -208,9 +207,6 @@ if isempty(f_plot)
     f_plot = 'n';
 end
 if f_plot == 'y'
-    
-    load('define');
-    load('result');
     
     FX = zeros([stp_max 1]);
     GX = zeros([num_lambda stp_max]);
