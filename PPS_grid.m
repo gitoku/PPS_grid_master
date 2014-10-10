@@ -55,49 +55,48 @@ agt_num = num_x/time_agt;
     %2:需要家
     
     agt_type=[
-        2,2,2,1,1,1,...%Region1
+        2,2,2,...%需要家1
+        1,1,1,...%供給家1
     ];
     
-    %% Gの決定
+    %% Hの決定
     % 奇数が需要家, 偶数が供給家
-    G_sym = -sym('x',1);
+    H_sym = -sym('x',1);
     for i=2:num_x
         if agt_type(i)==2
-            G_sym = G_sym - x(i);
+            H_sym = H_sym - x(i);
         elseif agt_type(i)==1
-            G_sym = G_sym + x(i);
+            H_sym = H_sym + x(i);
         end
     end
-    num_G = length(G_sym);
-    G_sym
+    num_H = length(H_sym);
+    H_sym
     
-    G = cell(num_G);
-    for m=1:num_G
-        G{m} = matlabFunction(G_sym(m),'vars',{x});
+    H = cell(num_H);
+    for m=1:num_H
+        H{m} = matlabFunction(H_sym(m),'vars',{x});
     end
 %     disp('Gの準備中');
     
     %% λの定義
-    num_lambda = num_G;
+    num_lambda = num_H;
     lambda = sym('lambda');
     
     % λGの決定
-    lG_sym = lambda.'*G_sym
+    lH_sym = lambda.'*H_sym
     
     %% d(λG)/dx　（手打ち）
-    dlGdx_sym = sym('dlGdx_sym',[num_x 1]);
-    dlGdxi = cell(num_x,1);
+    dlHdx_sym = sym('dlGdx_sym',[num_x 1]);
+    dlHdxi = cell(num_x,1);
     for n=1:num_x
-        dlGdx_sym(n) = diff(lG_sym, x(n));
-        dlGdxi{n} = matlabFunction(dlGdx_sym(n));
+        dlHdx_sym(n) = diff(lH_sym, x(n));
+        dlHdxi{n} = matlabFunction(dlHdx_sym(n));
     end
-    dlGdx = matlabFunction(dlGdx_sym);
-    
-    pause;
-    
+    dlHdx = matlabFunction(dlHdx_sym);
+        
     save('define','time_agt','num_x','agt_num','N','L_diag','Lp',...
-        'agt_type','G_sym','G','num_lambda','lambda','lG_sym',...
-        'dlGdx_sym','dlGdxi');
+        'agt_type','H_sym','H','num_lambda','lambda','lH_sym',...
+        'dlHdx_sym','dlHdxi');
     clear all;
     disp('初期化完了')
        
@@ -168,7 +167,7 @@ if f_run == 'y'
                 % xの更新
                 df = 2*gamma*(X_loop(i,k-1)-d(i));
                 lambda = LAMBDA(1,step-1);
-                dg = dlGdxi{i}(lambda);
+                dg = dlHdxi{i}(lambda);
                 x(i) = x(i) -A* ( df + dg);
                 
                 X_loop(i,k)=x(i);
@@ -190,17 +189,17 @@ if f_run == 'y'
         
         %λの更新:スーパバイザ方式
         for m = 1:num_lambda
-            LAMBDA(m,step) =(max(0, LAMBDA(m,step-1) + B_p*G{m}(X(:,step))));
+            LAMBDA(m,step) =(max(0, LAMBDA(m,step-1) + B_p*H{m}(X(:,step))));
         end
         
     end
     last_X = X(:,step)
+    last_LAMBDA = LAMBDA(:,step)
     
-    save ('result','stp_max','d','X','last_X','LAMBDA','gamma');
+    save ('result','stp_max','opt_max','d','X','last_X','LAMBDA','last_LAMBDA','gamma');
     clear all;
 end
 clear f_run;
-
 
 %% 結果の表示
 f_plot = input('plot?[y,n]', 's');  %'y'で実行
@@ -213,13 +212,13 @@ if f_plot == 'y'
     load('result');
     
     FX = zeros([stp_max 1]);
-    GX = zeros([num_lambda stp_max]);
+    HX = zeros([num_lambda stp_max]);
     for step=1:stp_max
         for i=1:num_x
             FX(step)= gamma*(X(i,step)-d(i))^2;
         end
         for m=1:num_lambda
-            GX(m,step) = G{m}(X(:,step));
+            HX(m,step) = H{m}(X(:,step));
         end
     end
     
@@ -240,22 +239,20 @@ if f_plot == 'y'
             end
         end
     end
-    plot_X1 = plot_X(:,1);
-    plot_X2 = plot_X(:,2);
     
     figure(1);
     title('x(i)の最適化推移');
-%     plot(time,X(1,:),time+10,X(2,:),time+20,X(3,:),time,X(4,:),time+10,X(5,:),time+20,X(6,:),'LineWidth',1.5);
-    plot(time,X(:,:),'LineWidth',1.5);
+    plot(time,X(1,:),time+10,X(2,:),time+20,X(3,:),time,X(4,:),time+10,X(5,:),time+20,X(6,:),'LineWidth',1.5);
+%     plot(time,X(:,:),'LineWidth',1.5);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
-    xlim([0 20]);
+%     xlim([0 20]);
     xlabel('step');
     ylabel('x(i)');
     grid on;
    
     figure(5);
     title('x(i)の最適解')
-    scatter(x_Time, plot_X1,'fill');
+    stem(x_Time, plot_X,'fill');
 %     ylim([0 100]);
     xlabel('時間')
     ylabel('変数量')
@@ -269,8 +266,8 @@ if f_plot == 'y'
 
     
     figure(2);
-    title('Gの推移');
-    plot(time,GX(:,:),'LineWidth',1.5);
+    title('Hの推移');
+    plot(time,HX(:,:),'LineWidth',1.5);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
 %     axis([0 40 -700 100]);
     xlabel('step');
