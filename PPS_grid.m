@@ -8,24 +8,23 @@ end
 if f_init == 'y' || exist('define.mat','file')~=2
     clear all;
     disp('初期化中...');
-    
-%% グラフの定義###
+      
+    %% グラフの定義###
  
-% 最小グラフ
-E = [   
-    1,4;
-    2,5;
-    3,6;
-];
+    % 最小グラフ
+    E = [   
+        1,4;
+        2,5;
+        3,6;
+    ];
 
-% エージェントの数, 変数の数決定
+    % エージェントの数, 変数の数決定
+    time_agt=3; 
+    num_x = max( max(E) );
+    agt_num = num_x/time_agt; 
 
-time_agt=3; 
-num_x = max( max(E) );
-agt_num = num_x/time_agt; 
 
-
-% 隣接行列 N
+    % 隣接行列 N
     N = zeros([num_x,num_x]);
     for i=1:length(E);
         N( E(i,1) , E(i,2) ) = 1;
@@ -47,6 +46,7 @@ agt_num = num_x/time_agt;
         Lp(i,i)=L_diag(i);
     end
     
+        
     %% xの決定
     x = sym('x',[num_x 1]);
     
@@ -59,6 +59,30 @@ agt_num = num_x/time_agt;
         1,1,1,...%供給家1
     ];
     
+    agt_sym = sym('x',[agt_num time_agt]);
+    
+       
+    %% Gの決定
+    G_hat_sym = [
+        x(4)-x(1);
+        x(5)-x(2);
+        x(6)-x(3);
+    ];
+
+    TIME_CONSTRAINT= 20; %各時間の制約
+    G_sym = [G_hat_sym.' (-G_hat_sym).'].';
+    for i=1:num_x
+        G_sym(i) = G_sym(i) - TIME_CONSTRAINT;
+    end
+    
+    num_G = length(G_sym);
+    
+    G = cell(num_G);
+    for m=1:num_G
+        G{m} = matlabFunction(G_sym(m),'vars',{x});
+    end
+    
+  
     %% Hの決定
     % 奇数が需要家, 偶数が供給家
     H_sym = -sym('x',1);
@@ -70,7 +94,6 @@ agt_num = num_x/time_agt;
         end
     end
     num_H = length(H_sym);
-    H_sym
     
     H = cell(num_H);
     for m=1:num_H
@@ -78,15 +101,40 @@ agt_num = num_x/time_agt;
     end
 %     disp('Gの準備中');
     
+   
     %% λの定義
-    num_lambda = num_H;
-    lambda = sym('lambda');
-    
+    num_lambda = num_H + num_G;
+    lambda = sym('lambda',[num_lambda 1]);
+    lG_sym = sym('lG_sym',[6 1]);
     % λGの決定
-    lH_sym = lambda.'*H_sym
+    for i=1:num_G
+        lG_sym(i) = lambda(i)*G_sym(i);
+    end
+    lG_sym
     
-    %% d(λG)/dx　（手打ち）
-    dlHdx_sym = sym('dlGdx_sym',[num_x 1]);
+    % λHの決定
+    lH_sym = lambda(num_lambda).'*H_sym
+    
+   
+    %% d(λG)/dx の決定
+    dlGdx_sym = sym('dlGdx_sym',[num_x num_x]);
+    dlGdxi = cell(num_x,1);
+    for n=1:num_x
+        for m=1:num_x
+        dlGdx_sym(n,m) = diff(lG_sym(m), x(n));
+        dlGdxi{n,m} = matlabFunction(dlGdx_sym(n,m));
+        end
+    end
+    dlGdx = matlabFunction(dlGdx_sym);
+    
+    % Region定義
+    lambda_matrix = zeros([num_x num_lambda]);
+    for i = 1:num_x
+        for j=1:num_lambda
+        end
+    end
+    %% d(λH)/dx　の決定
+    dlHdx_sym = sym('dlHdx_sym',[num_x 1]);
     dlHdxi = cell(num_x,1);
     for n=1:num_x
         dlHdx_sym(n) = diff(lH_sym, x(n));
@@ -95,8 +143,8 @@ agt_num = num_x/time_agt;
     dlHdx = matlabFunction(dlHdx_sym);
         
     save('define','time_agt','num_x','agt_num','N','L_diag','Lp',...
-        'agt_type','H_sym','H','num_lambda','lambda','lH_sym',...
-        'dlHdx_sym','dlHdxi');
+        'agt_type','G_hat_sym','G_sym','G','H_sym','H','num_lambda','lambda','lG_sym','lH_sym',...
+        'dlGdx_sym','dlGdxi','dlHdx_sym','dlHdxi');
     clear all;
     disp('初期化完了')
        
@@ -163,13 +211,15 @@ if f_run == 'y'
         %各ノードについてのループ
         for i=1:num_x
             k=2;
+            dg = 0;
             while true
                 % xの更新
                 df = 2*gamma*(X_loop(i,k-1)-d(i));
                 lambda = LAMBDA(1,step-1);
-                dg = dlHdxi{i}(lambda);
-                x(i) = x(i) -A* ( df + dg);
                 
+                dh = dlHdxi{i}(lambda);
+                x(i) = x(i) -A* ( df + dg + dh);
+
                 X_loop(i,k)=x(i);
                 dx = X_loop(i,k)-X_loop(i,k-1);
                 if abs(dx) < eps_x
@@ -181,8 +231,9 @@ if f_run == 'y'
                     disp('発散');
                     break;
                 end
-                
+
                 k=k+1;
+                disp([i j k])
             end
         end
         X(:,step) = x;
