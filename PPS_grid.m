@@ -69,7 +69,7 @@ if f_init == 'y' || exist('define.mat','file')~=2
         x(6)-x(3);
     ];
 
-    TIME_CONSTRAINT= 20; %各時間の制約
+    TIME_CONSTRAINT= -20  %各時間の制約
     G_sym = [G_hat_sym.' (-G_hat_sym).'].';
     for i=1:num_x
         G_sym(i) = G_sym(i) - TIME_CONSTRAINT;
@@ -103,48 +103,62 @@ if f_init == 'y' || exist('define.mat','file')~=2
     
    
     %% λの定義
-    num_lambda = num_H + num_G;
-    lambda = sym('lambda',[num_lambda 1]);
-    lG_sym = sym('lG_sym',[6 1]);
+    G_lambda = sym('G_lambda',[num_G 1]);
+    lG_sym = 0;
     % λGの決定
     for i=1:num_G
-        lG_sym(i) = lambda(i)*G_sym(i);
+        lG_sym = lG_sym + G_lambda(i)*G_sym(i);
     end
     lG_sym
     
     % λHの決定
-    lH_sym = lambda(num_lambda).'*H_sym
+    H_lambda = sym('H_lambda');
+    lH_sym = H_lambda.'*H_sym
     
    
     %% d(λG)/dx の決定
-    dlGdx_sym = sym('dlGdx_sym',[num_x num_x]);
+    dlGdx_sym = sym('dlGdx_sym',[num_x 1]);
     dlGdxi = cell(num_x,1);
     for n=1:num_x
-        for m=1:num_x
-        dlGdx_sym(n,m) = diff(lG_sym(m), x(n));
-        dlGdxi{n,m} = matlabFunction(dlGdx_sym(n,m));
-        end
+        dlGdx_sym(n) = diff(lG_sym, x(n));
+        dlGdxi{n} = matlabFunction(dlGdx_sym(n),'vars',{G_lambda});
     end
-    dlGdx = matlabFunction(dlGdx_sym);
+    dlGdx = matlabFunction(dlGdx_sym,'vars',{G_lambda});
     
     % Region定義
-    lambda_matrix = zeros([num_x num_lambda]);
-    for i = 1:num_x
-        for j=1:num_lambda
+%     for i=1:num_G
+%         G_lambda_sym(i) = lambda(i)*G_sym(i);
+%     end
+%     G_lm_sym = sym('G_lm',[num_x num_G]);
+%     for i = 1:num_G
+%         for j=1:num_x
+%             G_lm_sym(i,j) = diff(G_lambda_sym(i),x(j));
+%         end
+%     end
+%     G_lm_sym.'
+
+    for i=1:num_x
+        for j=1:num_G
+            if isnan(subs(G_sym(j),x(i),NaN))
+                G_lambda_matrix(i,j) = 1;
+            end
         end
     end
+    
     %% d(λH)/dx　の決定
     dlHdx_sym = sym('dlHdx_sym',[num_x 1]);
     dlHdxi = cell(num_x,1);
     for n=1:num_x
         dlHdx_sym(n) = diff(lH_sym, x(n));
-        dlHdxi{n} = matlabFunction(dlHdx_sym(n));
+        dlHdxi{n} = matlabFunction(dlHdx_sym(n),'vars',{H_lambda});
     end
-    dlHdx = matlabFunction(dlHdx_sym);
+    dlHdx = matlabFunction(dlHdx_sym,'vars',{H_lambda});
         
+    
+    
     save('define','time_agt','num_x','agt_num','N','L_diag','Lp',...
-        'agt_type','G_hat_sym','G_sym','G','H_sym','H','num_lambda','lambda','lG_sym','lH_sym',...
-        'dlGdx_sym','dlGdxi','dlHdx_sym','dlHdxi');
+        'agt_type','G_hat_sym','G_sym','G','num_G','H_sym','H','num_H','G_lambda','H_lambda','lG_sym','lH_sym',...
+        'dlGdx_sym','dlGdxi','G_lambda_matrix','dlHdx_sym','dlHdxi');
     clear all;
     disp('初期化完了')
        
@@ -160,9 +174,9 @@ B = .1;
 gamma = .01;
 c = .1./L_diag;
 
-B_p = B/sum(1./c);  %スーパバイザ用のB
-
-stp_max = 50;    %s(実行step数)の最大
+B_h = B/sum(1./c);  %スーパバイザ用のB
+B_g = .001;
+stp_max = 200;    %s(実行step数)の最大
 opt_max = 100;
 eps_x = .001;   %x[k]の更新の打ち切り基準:dx[k]<eps_x
 x_max = 1000;    %x[k]の更新の計算中止dx
@@ -179,17 +193,21 @@ if f_run == 'y'
     
     X = ones(num_x, stp_max);
     X_loop = ones(num_x,opt_max);
-    LAMBDA = ones(num_lambda, stp_max);  % スーパバイザ方式
-
+    LAMBDA_G = zeros(num_G, stp_max);  % スーパバイザ方式
+    LAMBDA_H = zeros(num_H,stp_max);
     
     %% 初期条件(step = 1)
     
-    X(:,1) =100*rand([num_x 1]);
+    X(:,1) = 10*rand([num_x 1]);
     X_loop(:,1,1) = X(:,1);
     first_x=X_loop(:,1)
     
-    LAMBDA(:,1) = 10*rand(1); %λの初期値
-    d = 100*rand([num_x 1]); % xiの所望量
+    for i=1:num_G
+        LAMBDA_G(i,1) = 10*rand(1);
+    end
+    LAMBDA_H(:,1) = rand(1); %λの初期値
+    
+    d = 10*rand([num_x 1]); % xiの所望量
     
 %     for i=1:num_x
 %         if agt_type(i)==2
@@ -200,7 +218,7 @@ if f_run == 'y'
 %     end
     d
     
-    
+    disp('x,λ更新中')
     %% ステップ実行(step >=2)
 %     disp('実行中...');
     for step = 2:stp_max
@@ -211,15 +229,14 @@ if f_run == 'y'
         %各ノードについてのループ
         for i=1:num_x
             k=2;
-            dg = 0;
+            
+            dg = dlGdxi{i}(LAMBDA_G(:,step-1));
+            dh = dlHdxi{i}(LAMBDA_H(:,step-1));
             while true
-                % xの更新
                 df = 2*gamma*(X_loop(i,k-1)-d(i));
-                lambda = LAMBDA(1,step-1);
-                
-                dh = dlHdxi{i}(lambda);
+                % xの更新                                     
                 x(i) = x(i) -A* ( df + dg + dh);
-
+                
                 X_loop(i,k)=x(i);
                 dx = X_loop(i,k)-X_loop(i,k-1);
                 if abs(dx) < eps_x
@@ -233,21 +250,26 @@ if f_run == 'y'
                 end
 
                 k=k+1;
-                disp([i j k])
+                
             end
         end
         X(:,step) = x;
-        
         %λの更新:スーパバイザ方式
-        for m = 1:num_lambda
-            LAMBDA(m,step) =(max(0, LAMBDA(m,step-1) + B_p*H{m}(X(:,step))));
+        for m=1:num_G
+            LAMBDA_G(m,step) =max(0, LAMBDA_G(m,step-1) + B_g*G{m}(X(:,step)));
+        end
+        for m=1:num_H
+%             LAMBDA_H(m,step) =(max(0, LAMBDA_H(m,step-1) + B_p*H{m}(X(:,step))));
+            LAMBDA_H(m,step) =LAMBDA_H(m,step-1) + B_h*H{m}(X(:,step));
         end
         
     end
     last_X = X(:,step)
-    last_LAMBDA = LAMBDA(:,step)
+    last_LAMBDA_G = LAMBDA_G(1:3,step) -LAMBDA_G(4:6,step)
+    last_LAMBDA_H = LAMBDA_H(:,step)
     
-    save ('result','stp_max','opt_max','d','X','last_X','LAMBDA','last_LAMBDA','gamma');
+    save ('result','stp_max','opt_max','d','X','last_X','LAMBDA_G',...
+        'LAMBDA_H','last_LAMBDA_G','last_LAMBDA_H','gamma');
     clear all;
 end
 clear f_run;
@@ -262,17 +284,22 @@ if f_plot == 'y'
     load('define');
     load('result');
     
-    FX = zeros([stp_max 1]);
-    HX = zeros([num_lambda stp_max]);
+    FX = zeros([1 stp_max]);
+    HX = zeros([num_H stp_max]);
+    GX = zeros([num_G stp_max]);
     for step=1:stp_max
         for i=1:num_x
-            FX(step)= gamma*(X(i,step)-d(i))^2;
+            FX(:,step)= FX(:,step) + gamma*(X(i,step)-d(i))^2;
         end
-        for m=1:num_lambda
+        for m=1:num_H
             HX(m,step) = H{m}(X(:,step));
         end
+        for n=1:num_G
+            GX(n,step) = G{n}(X(:,step));
+        end
     end
-    
+    last_GX = GX(:,step)
+    last_HX = HX(:,step)
     time=0:stp_max-1;
     time2=1:stp_max;
     opt_time=opt_max;
@@ -293,48 +320,61 @@ if f_plot == 'y'
     
     figure(1);
     title('x(i)の最適化推移');
-    plot(time,X(1,:),time+10,X(2,:),time+20,X(3,:),time,X(4,:),time+10,X(5,:),time+20,X(6,:),'LineWidth',1.5);
-%     plot(time,X(:,:),'LineWidth',1.5);
+%     plot(time,X(1,:),time+10,X(2,:),time+20,X(3,:),time,X(4,:),time+10,X(5,:),time+20,X(6,:),'LineWidth',1.5);
+    plot(time,X(:,:),'LineWidth',1.5);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
 %     xlim([0 20]);
     xlabel('step');
     ylabel('x(i)');
     grid on;
    
-    figure(5);
-    title('x(i)の最適解')
-    stem(x_Time, plot_X,'fill');
-%     ylim([0 100]);
-    xlabel('時間')
-    ylabel('変数量')
-    grid on;
+%     figure(2);
+%     title('x(i)の最適解')
+%     stem(x_Time, plot_X,'fill');
+% %     ylim([0 100]);
+%     xlabel('時間')
+%     ylabel('変数量')
+%     grid on;
     
-    
-%     figure(1);
-%     title('需要家1のx');
-%     plot(time,Dp(1,:),time,d(1),'LineWidth',1.5);
-%     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
-
-    
-    figure(2);
+    figure(3);
     title('Hの推移');
     plot(time,HX(:,:),'LineWidth',1.5);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
 %     axis([0 40 -700 100]);
     xlabel('step');
-    ylabel('G(x)');
-    grid on;
-    
-    figure(3);
-    title('λの推移');
-    plot(time,LAMBDA(:,:),'LineWidth',1.5);
-    set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
-%     xlim([0 40]);
-    xlabel('step');
-    ylabel('lambda');
+    ylabel('H(x)');
     grid on;
     
     figure(4);
+    list = [1 4];
+    title('Gの推移');
+    plot(time,GX(:,:),'LineWidth',1.5);
+    set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
+%     axis([0 80 -100 100]);
+    xlabel('step');
+    ylabel('G(x)');
+    grid on;
+    
+    LAMBDA_plot = LAMBDA_G(1:3,:) - LAMBDA_G(4:6,:);
+    figure(5)
+    title('Gのλの推移');
+    plot(time,LAMBDA_plot(:,:),'LineWidth',1.5);
+    set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
+%     xlim([0 40]);
+    xlabel('step');
+    ylabel('G_lambda');
+    grid on;
+    
+    figure(6);
+    title('Hのλの推移');
+    plot(time,LAMBDA_H(:,:),'LineWidth',1.5);
+    set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
+%     xlim([0 40]);
+    xlabel('step');
+    ylabel('H_lambda');
+    grid on;
+    
+    figure(7);
     title('F(x)の推移');
     plot(time,FX(:,:),'LineWidth',1.5);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
