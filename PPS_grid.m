@@ -69,10 +69,10 @@ if f_init == 'y' || exist('define.mat','file')~=2
         x(6)-x(3);
     ];
 
-    TIME_CONSTRAINT= -20  %各時間の制約
+    TC = 10  %各時間の制約
     G_sym = [G_hat_sym.' (-G_hat_sym).'].';
     for i=1:num_x
-        G_sym(i) = G_sym(i) - TIME_CONSTRAINT;
+        G_sym(i) = G_sym(i) + TC;
     end
     
     num_G = length(G_sym);
@@ -124,26 +124,7 @@ if f_init == 'y' || exist('define.mat','file')~=2
         dlGdxi{n} = matlabFunction(dlGdx_sym(n),'vars',{G_lambda});
     end
     dlGdx = matlabFunction(dlGdx_sym,'vars',{G_lambda});
-    
-    % Region定義
-%     for i=1:num_G
-%         G_lambda_sym(i) = lambda(i)*G_sym(i);
-%     end
-%     G_lm_sym = sym('G_lm',[num_x num_G]);
-%     for i = 1:num_G
-%         for j=1:num_x
-%             G_lm_sym(i,j) = diff(G_lambda_sym(i),x(j));
-%         end
-%     end
-%     G_lm_sym.'
 
-    for i=1:num_x
-        for j=1:num_G
-            if isnan(subs(G_sym(j),x(i),NaN))
-                G_lambda_matrix(i,j) = 1;
-            end
-        end
-    end
     
     %% d(λH)/dx　の決定
     dlHdx_sym = sym('dlHdx_sym',[num_x 1]);
@@ -158,7 +139,7 @@ if f_init == 'y' || exist('define.mat','file')~=2
     
     save('define','time_agt','num_x','agt_num','N','L_diag','Lp',...
         'agt_type','G_hat_sym','G_sym','G','num_G','H_sym','H','num_H','G_lambda','H_lambda','lG_sym','lH_sym',...
-        'dlGdx_sym','dlGdxi','G_lambda_matrix','dlHdx_sym','dlHdxi');
+        'dlGdx_sym','dlGdxi','dlHdx_sym','dlHdxi');
     clear all;
     disp('初期化完了')
        
@@ -176,7 +157,7 @@ c = .1./L_diag;
 
 B_h = B/sum(1./c);  %スーパバイザ用のB
 B_g = .001;
-stp_max = 200;    %s(実行step数)の最大
+stp_max = 70;    %s(実行step数)の最大
 opt_max = 100;
 eps_x = .001;   %x[k]の更新の打ち切り基準:dx[k]<eps_x
 x_max = 1000;    %x[k]の更新の計算中止dx
@@ -197,17 +178,17 @@ if f_run == 'y'
     LAMBDA_H = zeros(num_H,stp_max);
     
     %% 初期条件(step = 1)
-    
-    X(:,1) = 10*rand([num_x 1]);
+    rng(100); % 乱数固定用
+    X(:,1) = rand([num_x 1]);
     X_loop(:,1,1) = X(:,1);
     first_x=X_loop(:,1)
     
     for i=1:num_G
-        LAMBDA_G(i,1) = 10*rand(1);
+        LAMBDA_G(i,1) = rand(1);
     end
     LAMBDA_H(:,1) = rand(1); %λの初期値
     
-    d = 10*rand([num_x 1]); % xiの所望量
+    d = rand([num_x 1]); % xiの所望量
     
 %     for i=1:num_x
 %         if agt_type(i)==2
@@ -258,6 +239,7 @@ if f_run == 'y'
         for m=1:num_G
             LAMBDA_G(m,step) =max(0, LAMBDA_G(m,step-1) + B_g*G{m}(X(:,step)));
         end
+        
         for m=1:num_H
 %             LAMBDA_H(m,step) =(max(0, LAMBDA_H(m,step-1) + B_p*H{m}(X(:,step))));
             LAMBDA_H(m,step) =LAMBDA_H(m,step-1) + B_h*H{m}(X(:,step));
@@ -300,6 +282,8 @@ if f_plot == 'y'
     end
     last_GX = GX(:,step)
     last_HX = HX(:,step)
+    last_FX = FX(:,step)
+    
     time=0:stp_max-1;
     time2=1:stp_max;
     opt_time=opt_max;
@@ -320,8 +304,8 @@ if f_plot == 'y'
     
     figure(1);
     title('x(i)の最適化推移');
-%     plot(time,X(1,:),time+10,X(2,:),time+20,X(3,:),time,X(4,:),time+10,X(5,:),time+20,X(6,:),'LineWidth',1.5);
-    plot(time,X(:,:),'LineWidth',1.5);
+    plot(time,X(1,:),time+10,X(2,:),time+20,X(3,:),time,X(4,:),time+10,X(5,:),time+20,X(6,:),'LineWidth',1.5);
+%     plot(time,X(:,:),'LineWidth',1.5);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
 %     xlim([0 20]);
     xlabel('step');
@@ -348,6 +332,7 @@ if f_plot == 'y'
     figure(4);
     list = [1 4];
     title('Gの推移');
+%     plot(time,GX(1,:),time+10,GX(2,:),time+20,GX(3,:),time,GX(4,:),time+10,GX(5,:),time+20,GX(6,:),'LineWidth',1.5);
     plot(time,GX(:,:),'LineWidth',1.5);
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
 %     axis([0 80 -100 100]);
@@ -362,7 +347,7 @@ if f_plot == 'y'
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
 %     xlim([0 40]);
     xlabel('step');
-    ylabel('G_lambda');
+    ylabel('lambda_G');
     grid on;
     
     figure(6);
@@ -371,7 +356,7 @@ if f_plot == 'y'
     set(gca,'FontName','Times','Fontsize',18,'LineWidth',1.5);
 %     xlim([0 40]);
     xlabel('step');
-    ylabel('H_lambda');
+    ylabel('lambda_H');
     grid on;
     
     figure(7);
